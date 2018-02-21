@@ -33,6 +33,7 @@ def argsFetch():
   parser.add_argument('-cb', '--calculateBalance', help='Calculate Balance', required=False, action='store_const', const=1)
   parser.add_argument('-p', '--print', help='Calculate Balance', required=False, action='store_const', const=1)
   parser.add_argument('-db', '--dumpBalance', help='Dump Balance', required=False, action='store_const', const=1)
+  parser.add_argument('-cm', '--changeMemberCode', help='Dump Balance', required=False, action='store_const', const=1)
   parser.add_argument('-l', '--log-level', help='Log level defining verbosity', required=False)
   parser.add_argument('-od', '--orderDate', help='Order Date', required=False)
   parser.add_argument('-dt', '--deleteTransactions', help='Delete Transactions', required=False, action='store_const', const=1)
@@ -50,6 +51,29 @@ def main():
     limit = int(args['limit'])
   else:
     limit =1
+  if args['changeMemberCode']:
+    logger.info("Changing Member Code")
+    myUsers=User.objects.all()
+    for eachUser in myUsers:
+      username=eachUser.username
+      areaCode=username[0:2]
+      eachMember=Member.objects.filter(user=eachUser).first()
+      if eachMember is not None:
+        boxID=eachMember.boxID
+      else: 
+        boxID="abcd"
+      boxID=boxID[2:]
+      if boxID.isdigit():
+        if int(boxID) != 0 and int(boxID) != 1:
+          logger.info('username : %s boxID : %s ' % (username,boxID))
+          eachUser.username=str(boxID)
+          eachUser.save()
+      else:
+        a=1
+#    myMembers=Member.objects.all()[:1]
+#    for eachMember in myMembers:
+#      logger.info(eachMember.boxID)
+
   if args['print']:
     orderDateString=args['orderDate']
     orderDate=datetime.strptime(orderDateString, '%d-%m-%Y').date()

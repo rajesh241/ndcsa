@@ -17,6 +17,7 @@ from django.utils import timezone
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", djangoSettings)
 django.setup()
 
+from django.contrib.auth.models import User
 from csa.models import Member,Product,OrderForm,ConsolidatedOrderForm,MemberTransaction
 
 def argsFetch():
@@ -91,27 +92,41 @@ def main():
     worksheet = book.sheet_by_index(balanceSheetIndex)
     num_rows=worksheet.nrows-1
     curr_row=0
-    vegetableCostIndex=7
+    vegetableCostIndex=11
     creditIndex=10
     adjustmentIndex=11
     adjustmentReasonIndex=14
+    nameIndex=3
+    emailIndex=5
+    boxIDIndex=1 
+    password="nregapds!"
     while curr_row < num_rows:
       curr_row=curr_row+1
       memberCode=str(worksheet.cell_value(curr_row,0)).replace("-","").lstrip().rstrip()
-      vegetableCost=str(worksheet.cell_value(curr_row,vegetableCostIndex)).replace("-","").lstrip().rstrip()
+      vegetableCost=int(worksheet.cell_value(curr_row,vegetableCostIndex))
 
       if isBeforeSoftware==True:
         memberCode=str(worksheet.cell_value(curr_row,0)).replace("-","").lstrip().rstrip()
         myMember=Member.objects.filter(user__username=memberCode).first()
       else:
-        memberCode=str(worksheet.cell_value(curr_row,0)).replace("-","").lstrip().rstrip()
-        myMember=Member.objects.filter(boxID=memberCode).first()
+        memberCode=int(worksheet.cell_value(curr_row,0))
+        boxID=str(worksheet.cell_value(curr_row,boxIDIndex)).lstrip().rstrip()
+        email=str(worksheet.cell_value(curr_row,emailIndex)).lstrip().rstrip()
+        name=str(worksheet.cell_value(curr_row,nameIndex)).lstrip().rstrip()
+        myMember=Member.objects.filter(user__username=memberCode).first()
+        logger.info(str(int(memberCode)))
+        if myMember is None:
+          myUser=User.objects.create_user(username=memberCode,email=email,password=password)
+          Member.objects.create(user=myUser,boxID=boxID,name=name)
+        myMember=Member.objects.filter(user__username=memberCode).first()
+        #myMember=Member.objects.filter(boxID=memberCode).first()
 
       if myMember is None:
         allMembersFound=0
         logger.info("Member not found %s " % (memberCode))
       else:
-        error=addMemberTransaction(logger,myMember,"VEGBOX",1,vegetableCost,"DR",orderDate)
+        if vegetableCost != 0:
+          error=addMemberTransaction(logger,myMember,"VEGBOX",1,vegetableCost,"DR",orderDate)
         #Making the credit and Adjustment
         if isBeforeSoftware==True:
           if worksheet.cell_type(curr_row,creditIndex) != 0:
@@ -128,7 +143,6 @@ def main():
             else:
               adjustmentTransactionType="DR"
             error=addMemberTransaction(logger,myMember,"ADJST",1,adjustment,adjustmentTransactionType,orderDate,remarks=adjustmentReason)
-
 #This is for calcuating Credits
     if creditSheetIndex != 0:
       worksheet = book.sheet_by_index(creditSheetIndex)
@@ -137,12 +151,12 @@ def main():
       curr_row=0
       while curr_row < num_rows:
         curr_row +=1
-        memberCode=str(worksheet.cell_value(curr_row,0)).replace("-","")
+        memberCode=int(worksheet.cell_value(curr_row,0))
         Amount=worksheet.cell_value(curr_row,1)
         creditDateExcel=worksheet.cell_value(curr_row,2)
         creditDate = datetime(*xlrd.xldate_as_tuple(creditDateExcel, 0)).date()
-        logger.info(memberCode+str(Amount)+str(creditDate))
-        myMember=Member.objects.filter(boxID=memberCode).first()
+        logger.info(str(memberCode)+str(Amount)+str(creditDate))
+        myMember=Member.objects.filter(user__username=memberCode).first()
         if myMember is not None:
           error=addMemberTransaction(logger,myMember,"CRR",1,Amount,"CR",creditDate)
 #This is for calculating Products
@@ -157,11 +171,13 @@ def main():
       curr_col +=1
       if worksheet.cell_type(memberIndex,curr_col) != 0:
         memberCode=str(worksheet.cell_value(memberIndex,curr_col)).replace("-","")
+        memberCode=memberCode[2:]
       #  logger.info(memberCode)
         if isBeforeSoftware==True:
           myMember=Member.objects.filter(user__username=memberCode).first()
         else:
-          myMember=Member.objects.filter(boxID=memberCode).first()
+          myMember=Member.objects.filter(user__username=memberCode).first()
+          #myMember=Member.objects.filter(boxID=memberCode).first()
 
         if myMember is None:
           allMembersFound=0
